@@ -1,0 +1,76 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage x:Class="CastMyVote.MainPage"
+						 xmlns="http://xamarin.com/schemas/2014/forms"
+						 xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+						 xmlns:infrastructure="clr-namespace:XamarinUniversity.Infrastructure;assembly=XamU.Infrastructure"
+						 x:Name="RootPage"
+						 Title="Cast your Vote">
+
+		<ContentPage.ToolbarItems>
+				<ToolbarItem Command="{Binding ShowSurveyResults}" Text="Show Results" Icon="results.png" />
+				<ToolbarItem Command="{Binding RemoveAnswer}" Text="Remove My Response" Icon="trash.png" />
+		</ContentPage.ToolbarItems>
+
+		<Grid>
+				<StackLayout Padding="10" Spacing="10">
+						<Label Text="Enter your name:" />
+						<Entry Text="{Binding Name, Mode=TwoWay}" TextColor="Black" />
+
+						<Label Text="Question:" />
+						<Picker>
+								<Picker.Behaviors>
+										<infrastructure:PickerBindBehavior 
+												Items="{Binding Questions}" 
+												SelectedItem="{Binding SelectedQuestion, Mode=TwoWay}" />
+								</Picker.Behaviors>
+						</Picker>
+
+						<ListView Margin="20"
+											IsEnabled="{Binding HasName}"
+											ItemTapped="OnTurnOffSelection"
+											ItemsSource="{Binding Answers}"
+											SeparatorVisibility="None"
+											RowHeight="75"
+											VerticalOptions="FillAndExpand">
+								<ListView.ItemTemplate>
+										<DataTemplate>
+												<ViewCell>
+													<ContentView BackgroundColor="#c0c0c0" Margin="5">
+															<ContentView.GestureRecognizers>
+																	<TapGestureRecognizer Command="{Binding Source={x:Reference RootPage}, Path=BindingContext.SelectAnswer}" 
+																												CommandParameter="{Binding}" />
+															</ContentView.GestureRecognizers>
+															<ContentView.Triggers>
+																	<DataTrigger Binding="{Binding IsSelected}" TargetType="ContentView" Value="True">
+																			<Setter Property="BackgroundColor" Value="#90ff90" />
+																	</DataTrigger>
+															</ContentView.Triggers>     
+															<Label FontSize="Large" InputTransparent="True"
+																			HorizontalTextAlignment="Center"
+																			Text="{Binding Text}"
+																			TextColor="Black"
+																			VerticalTextAlignment="Center" />
+													</ContentView>
+												</ViewCell>
+										</DataTemplate>
+								</ListView.ItemTemplate>
+						</ListView>
+
+				</StackLayout>
+
+				<Grid BackgroundColor="Black" IsVisible="{Binding IsLoadingData}" Opacity=".8">
+						<ActivityIndicator IsRunning="{Binding IsLoadingData}" Color="White">
+							<ActivityIndicator.HorizontalOptions>
+								<OnPlatform x:TypeArguments="LayoutOptions" iOS="Center" Android="Center" WinPhone="FillAndExpand" />
+							</ActivityIndicator.HorizontalOptions>
+							<ActivityIndicator.VerticalOptions>
+									<OnPlatform x:TypeArguments="LayoutOptions" iOS="Center" Android="Center" WinPhone="Fill" />
+							</ActivityIndicator.VerticalOptions>
+							<ActivityIndicator.Scale>
+								<OnPlatform x:TypeArguments="x:Double" iOS="1" Android="1" WinPhone="4" />
+							</ActivityIndicator.Scale>
+						</ActivityIndicator>
+				</Grid>
+		</Grid>
+
+</ContentPage>
