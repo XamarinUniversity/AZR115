@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=US-ASCII">
+    <title>Exercise goals</title>
+    <link rel="stylesheet" type="text/css" href="./res/styles/normalize.css">
+    <link rel="stylesheet" type="text/css" href="./res/styles/prettify.css" />
+    <link rel="stylesheet" type="text/css" href="./res/styles/styles.css">
+</head>
+
+<body>
+    <!-- Use the same title as the StartHere -->
+    <header>AZR115 Building an Azure Mobile App Service</header>
+
+    <section id="main">
+        <h2>Exercise goals</h2>
+<p>In this exercise, you will complete your offline caching logic by adding code to synchronize the local database with the remote database on Azure.</p>
+<blockquote class="info-quote">To complete the exercise, you will need <a href="https://www.visualstudio.com/" target="_blank">Visual Studio for Windows or macOS</a> with the <a href="https://visualstudio.microsoft.com/xamarin/" target="_blank">Xamarin development tools</a> installed. You will also need either an emulator/simulator or a device to run the exercise on. Please see the <a href="https://docs.microsoft.com/xamarin/cross-platform/get-started/installation/" target="_blank">setup page</a> if you need help installing the Xamarin development environment.
+</blockquote>
+
+<hr>
+<h2>Validating the offline synchronization</h2>
+<p>Since you will now be able to work offline, it is helpful to be able to see what's currently stored on the server. You can do this by hitting the responses table directly with a REST client such as <a href="https://www.getpostman.com/" target="_blank">Postman</a>.
+The endpoint you want is <a href="https://xamu-voter.azurewebsites.net/tables/responses/" target="_blank">https://xamu-voter.azurewebsites.net/tables/responses/</a> (or whatever Azure service you created previously for this class). Alternatively, you can use the following code in a <a href="https://developer.xamarin.com/guides/cross-platform/workbooks/" target="_blank">Xamarin Workbook</a> or paste it into a console application or some other C# IDE and run it.</p>
+<pre class="prettyprint"><code>// Needs a reference to Newtonsoft.Json; 
+// use the File &gt; Add Package menu option in Workbooks
+
+#r &quot;Newtonsoft.Json&quot;
+
+using System.Net;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+
+string AzureUrl = &quot;https://xamu-voter.azurewebsites.net/tables/responses/&quot;;
+
+WebClient client = new WebClient();
+client.Headers.Add(&quot;ZUMO-API-VERSION&quot;, &quot;2.0.0&quot;);
+client.Headers.Add(&quot;Content-Type&quot;, &quot;application/json&quot;);
+
+Console.WriteLine(
+    JValue.Parse(client.DownloadString(AzureUrl))
+    .ToString(Formatting.Indented));
+</code></pre>
+
+
+<hr>
+<h2>Synchronize the questions table</h2>
+<p>Start by synchronizing the <strong>questions</strong> table. We will do this as part of our initialization logic in our service code.</p>
+<ol>
+<li>Locate the <code>InitializeAsync</code> method and use the <code>MobileServiceClient.SyncContext</code> to push changes to the remote database after we initialize our sync tables.</li>
+<li>
+<p>After you have pushed changes which may have been made offline, pull all of the questions from the Azure service. Since these do not change frequently, we will  pull them once as part of our initialization code.</p>
+<ul>
+<li>Since this is part of our initialization code, we can pass in a query name to our PullAsync call (such as <code>&quot;allQuestions&quot;</code>)  to turn on incremental sync</li>
+<li>You can use a standard full query</li>
+</ul>
+</li>
+<li>
+Catch any exceptions and write them to the debug console using <code>Debug.WriteLine</code>.
+</li>
+<li>Run the app and verify that the questions display in the app's UI.</li>
+</ol>
+<pre class="prettyprint-collapse"><code>async Task InitializeAsync()
+{
+    if (client != null)
+        return;
+    ...
+
+    try
+    {
+        await client.SyncContext.PushAsync();
+        await questionsTable.PullAsync(&quot;allQuestions&quot;, questionsTable.CreateQuery());
+    }
+    catch (Exception ex)
+    {
+        Debug.WriteLine(&quot;Got exception: {0}&quot;, ex.Message);
+    }
+}
+</code></pre>
+
+
+<hr>
+<h2>Synchronize the response table</h2>
+<p>Next, we need to write a method to synchronize our response table. This table will be changed by our app and by the server, so we will synchronize it more frequently than questions. The app works with responses <em>only</em> for the current question; we will use a custom query that only synchronizes for a particular question.</p>
+<ol>
+<li>Add a new method named <strong>SynchronizeResponsesAsync</strong> that returns a <code>Task</code> and takes both a <code>string</code> and the <strong>questionId</strong> we want to retrieve responses for.</li>
+<li>
+Use the <code>PullAsync</code> method to retrieve <em>only</em> the responses for the passed question ID.
+<ul>
+<li>We can turn on incremental sync by supplying a query name. However, it needs to be unique for each query meaning it needs to take into account the question ID. The easiest way to do that is to generate a unique string by appending the <code>questionId</code> itself.</li>
+</ul>
+</li>
+<li>As with the previous code, make sure to catch exceptions; output the exceptions to the debug console.</li>
+</ol>
+<pre class="prettyprint-collapse"><code>async Task SynchronizeResponsesAsync(string questionId)
+{
+    try 
+    {
+        await responseTable.PullAsync(&quot;syncResponses&quot; + questionId, responseTable.Where(r =&gt; r.SurveyQuestionId == questionId));
+    } 
+    catch (Exception ex) 
+    {
+        //TODO handle exception 
+        Debug.WriteLine(&quot;Got exception: {0}&quot;, ex.Message);
+    }
+}
+</code></pre>
+
+
+<hr>
+<h2>Perform synchronization</h2>
+<p>We will want to perform the response synchronization each time we change a record. Add a call to <code>SynchronizeResponsesAsync</code> into your <code>AddOrUpdateSurveyResponseAsync</code> and <code>DeleteSurveyResponseAsync</code> methods after you make the change.</p>
+<pre class="prettyprint-collapse"><code>public async Task AddOrUpdateSurveyResponseAsync(SurveyResponse response)
+{
+    await InitializeAsync();
+    if (string.IsNullOrEmpty(response.Id)) {
+        await responseTable.InsertAsync(response);
+    }
+
+    await responseTable.UpdateAsync(response);
+    <mark>await SynchronizeResponsesAsync(response.SurveyQuestionId);</mark>
+}
+
+public async Task DeleteSurveyResponseAsync(SurveyResponse response)
+{
+    await InitializeAsync();
+    await responseTable.DeleteAsync(response);
+    <mark>await SynchronizeResponsesAsync(response.SurveyQuestionId);</mark>
+}
+</code></pre>
+
+
+<hr>
+<h2>Respond to question changes</h2>
+<ol>
+<li>
+<p>We'll synchronize to the response table when we change the current question or name. In both cases, this will call  <code>GetResponseForSurveyAsync</code>. However, we don't want to refresh against the table every time since this is called often. Instead, refresh only if the passed question ID parameter changes.</p>
+<ul>
+<li>Create a private field to hold the last known <strong>questionId</strong> used to refresh the responses</li>
+<li>Check the field against the passed <strong>questionId</strong> parameter</li>
+</ul>
+</li>
+<li>
+Run the application and try adding and deleting a record. Compare it to the online version through the Workbook or a REST client.
+</li>
+</ol>
+<pre class="prettyprint-collapse"><code>string lastQuestionId;
+
+public async Task&lt;SurveyResponse&gt; GetResponseForSurveyAsync(
+    string questionId, string name)
+{
+    await InitializeAsync();
+
+    if (lastQuestionId != questionId) {
+        // Get the latest responses for this question.
+        await SynchronizeResponsesAsync(questionId);
+        lastQuestionId = questionId;
+    }
+
+    return (await responseTable.Where(
+        r =&gt; r.SurveyQuestionId == questionId &amp;&amp; r.Name == name)
+            .ToEnumerableAsync()).FirstOrDefault ();
+}
+</code></pre>
+
+
+<hr>
+<h2>Work with the application offline</h2>
+<p>Force the application offline and observe how it responds. </p>
+<p>We have several ways we can test no network. If you are on a physical device, you can switch to Airplane mode. On iOS, you can use the <a href="http://nshipster.com/network-link-conditioner/" target="_blank">Network Link Conditioner</a>. Alternatively, we can change the Azure url value to be something we cannot resolve.</p>
+<ol>
+<li>Change the <code>AzureUrl</code> constant string to be invalid. For example, change the <code>.net</code> suffix to <code>.zzz</code>.</li>
+<li>Run the application and make some changes.</li>
+<li>Check the live server; you should not see your changes.</li>
+<li>Close the app, reset the URL to its original value, and re-run it.</li>
+<li>When it launches, verify your changes are still in the app by observing the responses; it should immediately synchronize back to the server.</li>
+</ol>
+
+<hr>
+<h2>Optimize the network code</h2>
+<p>Optimize the network code by checking for network connectivity before attempting to synchronize the database.</p>
+<ol>
+<li>Add a NuGet reference to <strong>Xam.Plugin.Connectivity</strong> to all your projects.</li>
+</ol>
+<ide name="vs">
+<p class="spacing-top">
+<button class="spacing-both btn btn-toggle btn-purple" type="button" data-toggle="collapse" data-toggle-show-text="Add via Package Manager Console" data-toggle-hide-text="Hide" aria-expanded="false" data-target="#Tf4a3f71047f2491e82501a2ac96f8d63">Add via Package Manager Console</button>
+<div class="collapse" id="Tf4a3f71047f2491e82501a2ac96f8d63">
+<div class="card card-block">
+<p>
+<p>To add this NuGet package via the Package Manager Console, found in the menu under <strong>Tools &gt; NuGet Package Manager &gt; Package Manager Console</strong>, run the following command:</p>
+<pre class="prettyprint"><code>Install-Package Xam.Plugin.Connectivity
+</code></pre>
+
+</p>
+</div>
+</div>
+</p>
+</ide>
+<ol start="2">
+<li>Check the <code>Plugin.Connectivity.CrossConnectivity.Current.IsConnected</code> property before attempting to synchronize to the remote database.</li>
+<li>Run the application to verify that everything is working correctly.</li>
+</ol>
+<p>The completed solution has this code in place.</p>
+
+<hr>
+<h2>Congratulations!</h2>
+<p>In this exercise, you completed your offline caching by synchronizing your local database with the remote database on Azure.</p>
+<p>You can view the completed solution in the <strong>Exercise 5 &gt; Completed</strong> folder of your copy of the cloned or downloaded <a href="https://github.com/XamarinUniversity/AZR115/">course materials</a>.</p>
+
+
+        <div class="align-right">
+            <a href="../StartHere.html">Go Back</a>
+        </div>
+
+    </section>
+
+    <script src="./res/js/jquery.min.js"></script>
+    <script src="./res/js/jquery.imagemapster.min.js"></script>
+    <script src="./res/js/imagemap.js"></script>
+    <script src="./res/js/prettify.js"></script>
+    <script src="./res/js/script.js"></script>
+
+    <footer>Copyright (C) 2018 Xamarin Inc., Microsoft. All rights reserved.<br><a target="_blank" href="http://university.xamarin.com">Visit Xamarin University for more classes and content</a></footer>
+
+</body>
+</html>

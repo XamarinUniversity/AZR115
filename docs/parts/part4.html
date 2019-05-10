@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=US-ASCII">
+    <title>Exercise goals</title>
+    <link rel="stylesheet" type="text/css" href="./res/styles/normalize.css">
+    <link rel="stylesheet" type="text/css" href="./res/styles/prettify.css" />
+    <link rel="stylesheet" type="text/css" href="./res/styles/styles.css">
+</head>
+
+<body>
+    <!-- Use the same title as the StartHere -->
+    <header>AZR115 Building an Azure Mobile App Service</header>
+
+    <section id="main">
+        <h2>Exercise goals</h2>
+<p>In this exercise, you will continue modifying the <strong>CastMyVote</strong> Xamarin.Forms application to add support for offline caching.</p>
+<blockquote class="info-quote">To complete the exercise, you will need <a href="https://www.visualstudio.com/" target="_blank">Visual Studio for Windows or macOS</a> with the <a href="https://visualstudio.microsoft.com/xamarin/" target="_blank">Xamarin development tools</a> installed. You will also need either an emulator/simulator or a device to run the exercise on. Please see the <a href="https://docs.microsoft.com/xamarin/cross-platform/get-started/installation/" target="_blank">setup page</a> if you need help installing the Xamarin development environment.
+</blockquote>
+
+<hr>
+<h2>Add support for offline caching</h2>
+<p>To support offline caching, you will add another Azure NuGet package. For iOS specifically, we'll need to call an initialize method.</p>
+<ol>
+<li>Add a NuGet reference to the <strong>Microsoft.Azure.Mobile.Client.SQLiteStore</strong> package to each platform-specific projects and the PCL.</li>
+</ol>
+<ide name="vs">
+<p class="spacing-top">
+<button class="spacing-both btn btn-toggle btn-purple" type="button" data-toggle="collapse" data-toggle-show-text="Add via Package Manager Console" data-toggle-hide-text="Hide" aria-expanded="false" data-target="#Tbaff984b622540e385abe405bb0cc97b">Add via Package Manager Console</button>
+<div class="collapse" id="Tbaff984b622540e385abe405bb0cc97b">
+<div class="card card-block">
+<p>
+<p>To add this NuGet package via the Package Manager Console, found in the menu under <strong>Tools &gt; NuGet Package Manager &gt; Package Manager Console</strong>, run the following command:</p>
+<pre class="prettyprint"><code>Install-Package Microsoft.Azure.Mobile.Client.SQLiteStore
+</code></pre>
+
+</p>
+</div>
+</div>
+</p>
+</ide>
+<ol start="2">
+<li>Initialize SQLite in each of the platform-specific projects.</li>
+</ol>
+<pre class="prettyprint-collapse"><code>public override bool FinishedLaunching(UIApplication app, NSDictionary options)
+{
+    Microsoft.WindowsAzure.MobileServices.CurrentPlatform.Init();
+    <mark>SQLitePCL.Batteries.Init();</mark>
+    global::Xamarin.Forms.Forms.Init();
+    LoadApplication(new App());
+
+    return base.FinishedLaunching(app, options);
+}
+</code></pre>
+
+
+<hr>
+<h2>Initialize the SQLite database</h2>
+<p>We need to initialize our local database so the Azure client can work with a local data source instead of the remote database.</p>
+<ol>
+<li>Open <strong>AzureSurveyService.cs</strong>.</li>
+<li>In the <code>Initialize</code> method, create a new <code>MobileServiceSQLiteStore</code> instance and store it in a local field (in the method).</li>
+<li>Call the <code>DefineTable&lt;T&gt;</code> method on the database store for both of our DTOs: <code>SurveyQuestion</code> and <code>SurveyResponse</code>.</li>
+</ol>
+<pre class="prettyprint-collapse"><code><mark>using Microsoft.WindowsAzure.MobileServices.SQLiteStore;</mark>
+…
+void Initialize()
+{
+    if (client != null)
+        return;
+
+    <mark>var store = new MobileServiceSQLiteStore(&quot;survey.db&quot;);</mark>
+    <mark>store.DefineTable&lt;SurveyQuestion&gt;();</mark>
+    <mark>store.DefineTable&lt;SurveyResponse&gt;();</mark>
+
+    client = new MobileServiceClient(AzureUrl);
+    …
+}
+</code></pre>
+
+
+<hr>
+<h2>Initialize SyncContext</h2>
+<ol>
+<li>
+Next, call the <code>InitializeAsync</code> method on the <code>SyncContext</code> property of your <code>MobileServiceClient</code>. 
+<ul>
+<li>Pass the created store as the first parameter.</li>
+<li>Pass a new instance of <code>MobileServiceSyncHandler</code> as the second parameter. This class executes the async calls to synchronize the database; we are using the default implementation.</li>
+</ul>
+</li>
+<li>Notice that <code>InitializeAsync</code> is asynchronous and returns a <code>Task</code>. Modify the method to be async and return a <code>Task</code>; this allows errors to propagate out.</li>
+<li>Rename this method to <code>InitializeAsync</code> as well to indicate that this method is now async.</li>
+</ol>
+<pre class="prettyprint-collapse"><code>using Microsoft.WindowsAzure.MobileServices.Sync;
+…
+<mark>async Task</mark> Initialize<mark>Async</mark>()
+{
+    if (client != null)
+        return;
+
+    var store = new MobileServiceSQLiteStore(&quot;survey.db&quot;);
+    store.DefineTable&lt;SurveyQuestion&gt;();
+    store.DefineTable&lt;SurveyResponse&gt;();
+
+    client = new MobileServiceClient(AzureUrl);
+    <mark>await client.SyncContext.InitializeAsync(store, new MobileServiceSyncHandler());</mark>
+    …
+}
+</code></pre>
+
+
+<hr>
+<h2>Await initialization</h2>
+<ol>
+<li>The changes made in the previous step impact many parts of our class, as we call <code>InitializeAsync</code> from every method. Update all of the calls to <code>InitializeAsync</code> by adding the <code>await</code> keyword.</li>
+</ol>
+<pre class="prettyprint"><code>public async Task AddOrUpdateSurveyResponseAsync(SurveyResponse response)
+{
+    await InitializeAsync();
+    if (string.IsNullOrEmpty(response.Id)) {
+        await responseTable.InsertAsync(response);
+    }
+    await responseTable.UpdateAsync(response);
+}
+
+public async Task DeleteSurveyResponseAsync(SurveyResponse response)
+{
+    await InitializeAsync();
+    await responseTable.DeleteAsync(response);
+}
+
+public async Task&lt;IEnumerable&lt;SurveyQuestion&gt;&gt; GetQuestionsAsync()
+{
+    await InitializeAsync();
+    return await questionsTable.ReadAsync();
+}
+
+public async Task&lt;SurveyResponse&gt; GetResponseForSurveyAsync(string questionId, string name)
+{
+    await InitializeAsync();
+    return (await responseTable.Where(r =&gt; r.SurveyQuestionId == questionId 
+        &amp;&amp; r.Name == name)
+            .ToEnumerableAsync()).FirstOrDefault();
+}
+
+public async Task&lt;IEnumerable&lt;SurveyResponse&gt;&gt; GetResponsesForSurveyAsync (string questionId)
+{
+    await InitializeAsync();
+    return await responseTable
+        .OrderByDescending(r =&gt; r.UpdatedAt)
+        .Take(100).ToEnumerableAsync();
+}
+</code></pre>
+
+
+<hr>
+<h2>Use IMobileServiceSyncTable to query our data</h2>
+<p>The final step in switching to our local cache is to use the <code>IMobileServiceSyncTable</code> interface instead of our normal <code>IMobileServiceTable</code>.</p>
+<ol>
+<li>Change the two fields holding the questions and responses to be a <code>IMobileServiceSyncTable</code>.</li>
+<li>Change the call to GetTable on the <code>MobileServiceClient</code> to be <code>GetSyncTable</code>.</li>
+<li>Run the application to see the results.</li>
+</ol>
+<p>We are now using our local cached data; except we have no data! The screen will display but will be empty.</p>
+
+<hr>
+<h2>Congratulations!</h2>
+<p>In this exercise, you added support for locally caching data using the built-in support provided for Azure (and broke your app). We'll fix it in the next exercise.</p>
+<p>You can view the completed solution in the <strong>Exercise 4 &gt; Completed</strong> folder of your copy of the cloned or downloaded <a href="https://github.com/XamarinUniversity/AZR115/">course materials</a>.</p>
+
+
+        <div class="align-right">
+            <a href="../StartHere.html">Go Back</a>
+        </div>
+
+    </section>
+
+    <script src="./res/js/jquery.min.js"></script>
+    <script src="./res/js/jquery.imagemapster.min.js"></script>
+    <script src="./res/js/imagemap.js"></script>
+    <script src="./res/js/prettify.js"></script>
+    <script src="./res/js/script.js"></script>
+
+    <footer>Copyright (C) 2018 Xamarin Inc., Microsoft. All rights reserved.<br><a target="_blank" href="http://university.xamarin.com">Visit Xamarin University for more classes and content</a></footer>
+
+</body>
+</html>

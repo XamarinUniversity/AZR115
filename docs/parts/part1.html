@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=US-ASCII">
+    <title>Exercise goals</title>
+    <link rel="stylesheet" type="text/css" href="./res/styles/normalize.css">
+    <link rel="stylesheet" type="text/css" href="./res/styles/prettify.css" />
+    <link rel="stylesheet" type="text/css" href="./res/styles/styles.css">
+</head>
+
+<body>
+    <!-- Use the same title as the StartHere -->
+    <header>AZR115 Building an Azure Mobile App Service</header>
+
+    <section id="main">
+        <h2>Exercise goals</h2>
+<p>In this exercise, you will modify an existing Xamarin.Forms application to add support for Azure mobile app service. </p>
+<blockquote class="info-quote">To complete the exercise, you will need <a href="https://www.visualstudio.com/" target="_blank">Visual Studio for Windows or macOS</a> with the <a href="https://visualstudio.microsoft.com/xamarin/" target="_blank">Xamarin development tools</a> installed. You will also need either an emulator/simulator or a device to run the exercise on. Please see the <a href="https://docs.microsoft.com/xamarin/cross-platform/get-started/installation/" target="_blank">setup page</a> if you need help installing the Xamarin development environment.
+</blockquote>
+
+<hr>
+<h2>Run the application</h2>
+<p>Before you start coding, open and explore the <strong>Exercise 1 &gt; Start</strong> solution from your copy of the cloned or downloaded <a href="https://github.com/XamarinUniversity/AZR115/">course materials</a>. The application is a Xamarin.Forms based survey (voting) application that will use Azure as the database. The starting project has a mocked-out service which manages data locally. This allows you run and use the application before making changes.</p>
+<ol>
+<li>
+Set your preferred platform-specific project as the startup project. For Windows projects, you will likely need to select a configuration other than <em>AnyCPU</em>.
+</li>
+<li>
+Build and run the application to see it work.
+</li>
+</ol>
+<figure class="figure">
+<img src="./images/ex1-running-app.png" alt="image" />
+</figure>
+
+<hr>
+<h2>Explore the starter solution</h2>
+<ol>
+<li>Examine the projects contained within the solution:</li>
+</ol>
+<table>
+<thead>
+<tr>
+	<th>Project</th>
+	<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+	<td><strong>CastMyVote</strong></td>
+	<td>This is the Xamarin.Forms Portable Class Library (PCL) shared assembly. It contains the page definitions (main page and a results page), the models, and the code which will interact with the service. Currently, it has an example implementation that does everything with local, hard-coded data. Examine <strong>ISurveyQuestionService</strong>; you will implement this interface to connect to the Azure service.</td>
+</tr>
+<tr>
+	<td><strong>CastMyVote.Droid</strong></td>
+	<td>The Xamarin.Android platform-specific (head) project.</td>
+</tr>
+<tr>
+	<td><strong>CastMyVote.iOS</strong></td>
+	<td>The Xamarin.iOS platform-specific (head) project. You will need a macOS build host to compile and run this application.</td>
+</tr>
+<tr>
+	<td><strong>CastMyVote.UWP</strong></td>
+	<td>The Windows UWP platform-specific (head) project. You will need Visual Studio for Windows to run this project. On macOS, this project will be disabled.</td>
+</tr>
+</tbody>
+</table>
+
+<hr>
+<h2>Add the Azure NuGet references</h2>
+<p>We need to add the Azure client libraries to our projects. It will allow us to connect to Azure and interact with the exposed table endpoints.</p>
+<ol>
+<li>Add the <strong>Microsoft.Azure.Mobile.Client NuGet</strong> package to all of the projects.</li>
+</ol>
+<ide name="vs">
+<p class="spacing-top">
+<button class="spacing-both btn btn-toggle btn-purple" type="button" data-toggle="collapse" data-toggle-show-text="Add via Package Manager Console" data-toggle-hide-text="Hide" aria-expanded="false" data-target="#Td2132a3ce9d04036bae5af4a0561094c">Add via Package Manager Console</button>
+<div class="collapse" id="Td2132a3ce9d04036bae5af4a0561094c">
+<div class="card card-block">
+<p>
+<p>To add this NuGet package via the Package Manager Console, found in the menu under <strong>Tools &gt; NuGet Package Manager &gt; Package Manager Console</strong>, run the following command:</p>
+<pre class="prettyprint"><code>Install-Package Microsoft.Azure.Mobile.Client
+</code></pre>
+
+</p>
+</div>
+</div>
+</p>
+</ide>
+<ol start="2">
+<li>Visual Studio on Windows will let you do this through a single dialog, Visual Studio for Mac requires that you add the package to each project individually.</li>
+</ol>
+<ide name="xs">
+<img src="./images/ex1-nuget-packages-xs.png" alt="image" />
+</ide>
+<ide name="vs">
+<img src="./images/ex1-nuget-packages-vs.png" alt="image" />
+</ide>
+
+<hr>
+<h2>Initialize the Azure library for Android</h2>
+<p>Android and iOS both must initialize the Azure client library by adding a line of code into the initialization of the app. This code must be added in the platform-specific projects; the method is not available in the PCL profile. </p>
+<p>Let's start with Android</p>
+<ol>
+<li>
+Open <strong>MainActity.cs</strong> in the Xamarin.Android head project. As this is a Xamarin.Forms app, the main Activity is only created once per application launch; we can do our initialization here.
+</li>
+<li>
+Call <code>Microsoft.WindowsAzure.MobileServices.CurrentPlatform.Init()</code> in the <code>OnCreate</code> override, you can place it before the <code>Forms.Init</code> call.
+</li>
+</ol>
+<pre class="prettyprint-collapse"><code>protected override void OnCreate(Bundle bundle)
+{
+    base.OnCreate(bundle);
+
+    <mark>Microsoft.WindowsAzure.MobileServices.CurrentPlatform.Init();</mark>
+
+    global::Xamarin.Forms.Forms.Init(this, bundle);
+    LoadApplication(new App());
+}
+</code></pre>
+
+
+<hr>
+<h2>Initialize the Azure library for iOS</h2>
+<p>Now let's initialize Azure in our iOS head project</p>
+<ol>
+<li>Open <strong>AppDelegate.cs</strong> in the <strong>Xamarin.iOS</strong> head project and find the <code>FinishedLaunching</code> method.</li>
+<li>Call <code>Microsoft.WindowsAzure.MobileServices.CurrentPlatform.Init()</code>; place it before the <code>Forms.Init</code> call.</li>
+</ol>
+<pre class="prettyprint-collapse"><code>public override bool FinishedLaunching(UIApplication app, NSDictionary options)
+{
+    <mark>Microsoft.WindowsAzure.MobileServices.CurrentPlatform.Init();</mark>
+
+    global::Xamarin.Forms.Forms.Init();
+    LoadApplication(new App());
+
+    return base.FinishedLaunching(app, options);
+</code></pre>
+
+
+<hr>
+<h2>Create a new service class to interact with Azure</h2>
+<p>To interact with an Azure service, you use a <code>MobileServiceClient</code> object. We will create one and place it into our new <code>AzureSurveyService</code> class.</p>
+<ol>
+<li>Add a new private field of type <code>MobileServiceClient</code>.</li>
+<li>Add a new private method named <strong>Initialize</strong>.</li>
+<li>In <code>Initialize</code> create a mobile service client object and assign it to your field.</li>
+<li>You will need the URL of the Azure service to pass into the constructor. You will work with a pre-built service (it is the same service built in <strong>AZR110</strong>). You can use your own or use the pre-built server: <a href="https://xamu-voter.azurewebsites.net" target="_blank">https://xamu-voter.azurewebsites.net</a>.</li>
+</ol>
+<pre class="prettyprint-collapse"><code>public class AzureSurveyService : ISurveyQuestionService
+{
+    const string AzureUrl = &quot;https://xamu-voter.azurewebsites.net&quot;;
+    MobileServiceClient client;
+
+    void Initialize()
+    {
+        client = new MobileServiceClient(AzureUrl);
+    }
+
+    public Task AddOrUpdateSurveResponseAsync(SurveyResponse response)
+    {
+        throw new NotImplementedException();
+    }
+    ...
+}
+</code></pre>
+
+
+<hr>
+<h2>Create MobileServiceClient</h2>
+<p>To interact with an Azure service, you use a <code>MobileServiceClient</code> object. We'll create one and place it into our <strong>AzureSurveyService</strong> class.</p>
+<ol>
+<li>Add a check in the <code>Initialize</code> method to see if the <code>MobileServiceClient</code> has been created (non-null), and if so, return. We want to be able to call this method multiple times, but only have the logic executed once.</li>
+<li>Add a call to the <code>Initialize</code> method into each of your implementation methods.</li>
+</ol>
+<pre class="prettyprint-collapse"><code>public class AzureSurveyService : ISurveyQuestionService
+{
+    …
+    void Initialize()
+    {
+        if (client != null)
+            return;
+
+        client = new MobileServiceClient(AzureUrl);
+    }
+
+    public Task AddOrUpdateSurveResponseAsync(SurveyResponse response)
+    {
+        Initialize();
+        throw new NotImplementedException();
+    }
+
+    public Task DeleteSurveyResponseAsync (SurveyResponse response)
+    {
+        Initialize();
+        throw new NotImplementedException();
+    }
+
+}
+</code></pre>
+
+
+<hr>
+<h2>Replace the service mock</h2>
+<p>Now, let's use your new Azure service.</p>
+<ol>
+<li>Open  <strong>MainPage.xaml.cs</strong>. </li>
+<li>It allocates an <code>ISurveyQuestionService</code> as a field in the class. Replace the <code>MockSurveyQuestionService</code> instance with a new <code>AzureSurveyService</code> instance.</li>
+</ol>
+<pre class="prettyprint-collapse"><code>public class MainPage : ContentPage
+{
+    readonly ISurveyQuestionService service = new AzureSurveyService();
+    …
+}
+</code></pre>
+
+<ol start="3">
+<li>Run the application.</li>
+</ol>
+<p>It will fail and display a message indicating the called <em>&quot;method is not implemented&quot;</em>. </p>
+<p>You have created an Azure connection and are setup to start implementing the data access methods.</p>
+<figure class="figure">
+<img src="./images/ex1-run-fail.png" alt="image" />
+</figure>
+
+<hr>
+<h2>Congratulations!</h2>
+<p>In this exercise, you added support to access an Azure mobile service to an existing Xamarin.Forms application.</p>
+<p>You can view the completed solution in the <strong>Exercise 1 &gt; Completed</strong> folder of your copy of the cloned or downloaded <a href="https://github.com/XamarinUniversity/AZR115/">course materials</a>.</p>
+
+
+        <div class="align-right">
+            <a href="../StartHere.html">Go Back</a>
+        </div>
+
+    </section>
+
+    <script src="./res/js/jquery.min.js"></script>
+    <script src="./res/js/jquery.imagemapster.min.js"></script>
+    <script src="./res/js/imagemap.js"></script>
+    <script src="./res/js/prettify.js"></script>
+    <script src="./res/js/script.js"></script>
+
+    <footer>Copyright (C) 2018 Xamarin Inc., Microsoft. All rights reserved.<br><a target="_blank" href="http://university.xamarin.com">Visit Xamarin University for more classes and content</a></footer>
+
+</body>
+</html>
