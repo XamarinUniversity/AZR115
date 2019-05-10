@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=US-ASCII">
+    <title>AZR115 Building an Azure Mobile App Service</title>
+    <link rel="stylesheet" type="text/css" href="./parts/res/styles/normalize.css">
+    <link rel="stylesheet" type="text/css" href="./parts/res/styles/prettify.css">
+    <link rel="stylesheet" type="text/css" href="./parts/res/styles/styles.css">
+</head>
+
+<body>
+    <!-- This will be filled in at runtime -->
+    <header role="course-title"></header>
+    <section id="main">
+        <h2>Building an Azure Mobile App Client (AZR115)</h2>
+<p>Suppose you have your data stored in the Azure cloud and are coding Xamarin apps to show the data to clients on multiple platforms. You could use HttpClient to transfer JSON-encoded data and a serializer to convert between JSON and your model objects. This works but is tedious to implement. A better option is the Azure client SDK because it simplifies basic CRUD operations and offers advanced features such as offline caching. This course shows you how to use MobileServiceClient from the Azure SDK to work with your Azure data tables. You will consume data from an Azure service, add support for offline caching and synchronization, and manage data conflicts when they arise.</p>
+<p>This class assumes you have already setup an Azure account and have a basic knowledge of the Azure management portal.</p>
+<h3>
+Recommended prerequisite for this course
+</h3>
+<ul>
+<li><a href="/azure/azr101/">Introduction to Azure (AZR101)</a></li>
+</ul>
+<h3>Upon completion you will be able to:</h3>
+<ol>
+<li>Connect your mobile app to Azure</li>
+<li>Access table data from Azure</li>
+<li>Add support for offline synchronization</li>
+</ol>
+<h3>Course exercise download</h3>
+<p>Exercise materials are available from <a href="https://github.com/XamarinUniversity/AZR115/">GitHub</a>. The code can be cloned through a desktop Git client or <a href="https://github.com/XamarinUniversity/AZR115/archive/master.zip">downloaded directly</a> as a ZIP file.</p>
+<h2>Lecture</h2>
+<p>Here are the <a target="_blank" href="./parts/slides.pdf">lecture slides</a>.</p>
+<h2>Exercises</h2>
+<ol>
+<li>
+<a href="parts/part1.html">Exercise goals</a>
+<br>
+<p>In this exercise, you will modify an existing Xamarin.Forms application to add support for Azure mobile app service. </p>
+</li>
+<li>
+<a href="parts/part2.html">Exercise goals</a>
+<br>
+<p>In this exercise, you will continue to develop the <strong>CastMyVote</strong> Xamarin.Forms application. You will modify the data structures used by the application to reflect the shape of the service.</p>
+</li>
+<li>
+<a href="parts/part3.html">Exercise goals</a>
+<br>
+<p>In this exercise, you will continue modifying the <strong>CastMyVote</strong> Xamarin.Forms to add support for querying and updating our created tables in the Azure service we created.</p>
+</li>
+<li>
+<a href="parts/part4.html">Exercise goals</a>
+<br>
+<p>In this exercise, you will continue modifying the <strong>CastMyVote</strong> Xamarin.Forms application to add support for offline caching.</p>
+</li>
+<li>
+<a href="parts/part5.html">Exercise goals</a>
+<br>
+<p>In this exercise, you will complete your offline caching logic by adding code to synchronize the local database with the remote database on Azure.</p>
+</li>
+<li>
+<a href="parts/part6.html">Exercise goals</a>
+<br>
+<p>In this exercise, you will add conflict resolution support to your client so that you can detect when records are changed by multiple clients.</p>
+</li>
+</ol>
+
+            <!-- This section is for additional links and examples that are relevant to 
+                the material in this course -->
+            <h2>Additional resources</h2>
+                <h3>Additional Resources</h3>
+                    <p>Download Visual Studio and explore Azure docuementation and resources.</p>
+                <div class="wslist">
+                    <a target="_blank" href="https://www.visualstudio.com/vs/">Get Visual Studio</a>        
+                    <a target="_blank" href="https://developer.xamarin.com/workbooks/">Xamarian Workbooks</a>        
+                    <a target="_blank" href="https://github.com/Azure/azure-mobile-apps-net-client">Azure SDK Client .NET source code (Github)</a>        
+                    <a target="_blank" href="https://docs.microsoft.com/en-us/azure/app-service-mobile/app-service-mobile-offline-data-sync">Offline Data Sync in Azure Mobile Apps</a>        
+                    <a target="_blank" href="https://shellmonger.com/2016/05/02/30-days-of-zumo-v2-azure-mobile-apps-day-15-understanding-offline-sync/">Understanding Offline Sync</a>        
+                    <a target="_blank" href="https://blog.xamarin.com/add-a-backend-to-your-app-in-10-minutes/">Add an Azure backend to your Xamarin app in 10 minutes</a>        
+                </div>
+                <h3>Explore On Your Own</h3>
+                    <p>We have Getting Started guides and documentation available on our developer portal</p>
+                <div class="wslist">
+                    <a target="_blank" href="https://developer.xamarin.com/guides/cross-platform/azure/">Azure Developer Xamerin Guides</a>        
+                    <a target="_blank" href="https://azure.microsoft.com/en-us/features/xamarin/?v=17.23h">Xamarin and Azure</a>        
+                </div>
+    </section>
+    <script src="./parts/res/js/jquery.min.js"></script>
+    <script src="./parts/res/js/prettify.js"></script>
+    <script src="./parts/res/js/script.js"></script>
+
+    <footer>Copyright (C) 2018 Xamarin Inc., Microsoft. All rights reserved.<br><a target="_blank" href="http://university.xamarin.com">Visit Xamarin University for more classes and content</a></footer>
+
+</body>
+</html>

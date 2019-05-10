@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=US-ASCII">
+    <title>Exercise goals</title>
+    <link rel="stylesheet" type="text/css" href="./res/styles/normalize.css">
+    <link rel="stylesheet" type="text/css" href="./res/styles/prettify.css" />
+    <link rel="stylesheet" type="text/css" href="./res/styles/styles.css">
+</head>
+
+<body>
+    <!-- Use the same title as the StartHere -->
+    <header>AZR115 Building an Azure Mobile App Service</header>
+
+    <section id="main">
+        <h2>Exercise goals</h2>
+<p>In this exercise, you will add conflict resolution support to your client so that you can detect when records are changed by multiple clients.</p>
+<blockquote class="info-quote">To complete the exercise, you will need <a href="https://www.visualstudio.com/" target="_blank">Visual Studio for Windows or macOS</a> with the <a href="https://visualstudio.microsoft.com/xamarin/" target="_blank">Xamarin development tools</a> installed. You will also need either an emulator/simulator or a device to run the exercise on. Please see the <a href="https://docs.microsoft.com/xamarin/cross-platform/get-started/installation/" target="_blank">setup page</a> if you need help installing the Xamarin development environment.
+</blockquote>
+
+<hr>
+<h2>Add version support to our survey response object</h2>
+<p>The first step in adding conflict resolution support is to include the <strong>version</strong> property in the DTO. We'll make sure to send it to the server each time we push data so the server knows if we are working with a current or older version of the row.</p>
+<p>Add a property named <code>AzureVersion</code> to the <strong>SurveyResponse</strong> object. Decorate it with a <code>[Version]</code> attribute.</p>
+<pre class="prettyprint-collapse"><code>[Version]
+public string AzureVersion { get; set; }
+</code></pre>
+
+
+<hr>
+<h2>Catch the push failure exception</h2>
+<p>The Azure client SDK throws a <code>MobileServicePushFailedException</code> when a push failure occurs which we need to catch. Within the details of this exception, it is an HTTP error code (Conflict or PreconditionFailed).</p>
+<ol>
+<li>In the <code>SynchronizeResponsesAsync</code> method, add a catch block to handle the <code>MobileServicePushFailedException</code> exception.</li>
+</ol>
+<blockquote>
+Make sure to put this catch handler above the generic exception handler!
+</blockquote>
+<ol start="2">
+<li>In the body of the catch handler, test the <code>PushResult</code> property and make sure it is non-null. If so, enumerate the <code>Errors</code> collection on the push result and pass each one to a new method named <code>ResolveError</code>.</li>
+<li>Since the error resolution will always involve some database activity, have the new method return a <code>Task</code>and <code>await</code> it in your exception body. It should take a <code>MobileServiceTableOperationError parameter</code>, the error to resolve.</li>
+</ol>
+<pre class="prettyprint-collapse"><code>async Task SynchronizeResponsesAsync(string questionId)
+{
+    ...
+    try 
+    {
+        ...
+    } 
+    catch (MobileServicePushFailedException ex)
+    {
+        if (ex.PushResult != null) 
+        {
+            foreach (var result in ex.PushResult.Errors)
+            {
+                await ResolveError(result);
+            }
+            await client.SyncContext.PushAsync();
+        }
+    }
+    catch (Exception ex) 
+    {
+        Debug.WriteLine(&quot;Got exception: {0}&quot;, ex.Message);
+    }
+}
+</code></pre>
+
+
+<hr>
+<h2>Implement conflict resolution</h2>
+<p>Implement the code which will resolve each error.</p>
+<ol>
+<li>Check the <code>Result</code> and <code>Item</code> property on the input operation error. If either are <code>null</code>, return from the method. We can ignore the failure, and it will try again the next time we attempt a push.</li>
+<li>Get the server and client version of the row that failed to update. These are included as properties on the table error in raw JSON. We can turn them back into our SurveyResponse objects through a <code>Newtonsoft.Json</code> extension method:</li>
+</ol>
+<pre class="prettyprint"><code>var serverItem = result.Result.ToObject&lt;SurveyResponse&gt;();
+var localItem = result.Item.ToObject&lt;SurveyResponse&gt;();
+</code></pre>
+
+<ol start="3">
+<li>
+<p>Compare the two objects to see if the custom properties are the same.</p>
+<p>If they are, then a record was updated with the same data. In this case, we can call the <code>CancelAndDiscardItemAsync</code> method on the table error object.</p>
+<p>If the properties are not the same, we have a true conflict. Here we would decide what to do: prompt the user, assume newer data wins, etc. Here we will always use the client version. We have a few steps:</p>
+<ol>
+<li>Update the version field on the local object to match the server version. It will ensure that the server takes our change or it will be rejected.</li>
+<li>Call the <code>UpdateOperationAsync</code> method on the table error object and pass it the JSON version of our local object; use <code>JObject.FromObject</code> which comes from <code>Newtonsoft.Json</code>.</li>
+</ol>
+</li>
+</ol>
+<pre class="prettyprint-collapse"><code>async Task ResolveError(MobileServiceTableOperationError result)
+{
+    // Ignore if we can't see both sides.
+    if (result.Result == null || result.Item == null)
+        return;
+
+    var serverItem = result.Result.ToObject&lt;SurveyResponse&gt;();
+    var localItem = result.Item.ToObject&lt;SurveyResponse&gt;();
+
+    if (serverItem.Name == localItem.Name
+        &amp;&amp; serverItem.ResponseIndex == localItem.ResponseIndex
+        &amp;&amp; serverItem.SurveyQuestionId == localItem.SurveyQuestionId) 
+    {
+        // Items are the same, so ignore the conflict
+        await result.CancelAndDiscardItemAsync();
+    } 
+    else 
+    {
+        // Always take the client
+        localItem.AzureVersion = serverItem.AzureVersion;
+        await result.UpdateOperationAsync(JObject.FromObject(localItem));
+    }
+}
+</code></pre>
+
+
+<hr>
+<h2>Test your error resolution logic</h2>
+<p>The easiest way to test the conflict logic is to force the client app to be offline and change some records.</p>
+<ol>
+<li>
+Close the app and alter the same records with another client, such as a REST client or another copy of the app running on a different device.
+</li>
+<li>
+Restore an online connection to the first application; it will attempt to synchronize and receive conflicts.
+</li>
+</ol>
+<blockquote>
+You can set breakpoints and trace through the code, or use <code>Debug.WriteLine</code> to output diagnostic messages to see the conflicts happen and get resolved.
+</blockquote>
+
+<hr>
+<h2>Congratulations!</h2>
+<p>In this exercise, you completed your client code to support a full offline-sync experience, including conflict resolution.</p>
+<p>You can view the completed solution in the <strong>Exercise 6 &gt; Completed</strong> folder of your copy of the cloned or downloaded <a href="https://github.com/XamarinUniversity/AZR115/">course materials</a>.</p>
+
+
+        <div class="align-right">
+            <a href="../StartHere.html">Go Back</a>
+        </div>
+
+    </section>
+
+    <script src="./res/js/jquery.min.js"></script>
+    <script src="./res/js/jquery.imagemapster.min.js"></script>
+    <script src="./res/js/imagemap.js"></script>
+    <script src="./res/js/prettify.js"></script>
+    <script src="./res/js/script.js"></script>
+
+    <footer>Copyright (C) 2018 Xamarin Inc., Microsoft. All rights reserved.<br><a target="_blank" href="http://university.xamarin.com">Visit Xamarin University for more classes and content</a></footer>
+
+</body>
+</html>
